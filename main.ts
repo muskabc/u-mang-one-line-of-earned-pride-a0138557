@@ -1,29 +1,34 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 
-const here = dirname(fileURLToPath(import.meta.url));
-const sourcePath = join(here, "line.txt");
-const targetDir = "/output";
-const targetPath = join(targetDir, "entry.txt");
+const limits = { shortest: 1, longest: 240 };
+const source = new URL("line.txt", import.meta.url);
+const destination = "/output/entry.txt";
 
-const MIN = 1;
-const MAX = 240;
+function run(): void {
+  const bytes = readFileSync(source);
+  const text = bytes.toString("utf8").replace(/\r?\n$/, "");
 
-function fail(message: string): never {
-  console.error(`error: ${message}`);
-  process.exit(1);
+  const singleLine = /^[^\r\n]+$/.test(text);
+  if (!singleLine) {
+    throw new Error("line.txt must contain exactly one line of text");
+  }
+  if (text.trim() === "") {
+    throw new Error("line.txt must not be blank");
+  }
+  if (text.length < limits.shortest || text.length > limits.longest) {
+    throw new Error(
+      `line must be ${limits.shortest} to ${limits.longest} characters long, found ${text.length}`,
+    );
+  }
+
+  mkdirSync("/output", { recursive: true });
+  writeFileSync(destination, text, { encoding: "utf8", flag: "w" });
+  console.log(`entry written: ${text.length} characters -> ${destination}`);
 }
 
-const raw = await readFile(sourcePath, "utf8");
-const line = raw.endsWith("\n") ? raw.slice(0, -1) : raw;
-
-if (line.includes("\n") || line.includes("\r")) fail("line.txt must hold exactly one line");
-if (line.trim().length === 0) fail("line.txt must not be blank");
-if (line.length < MIN || line.length > MAX) {
-  fail(`line must be ${MIN}-${MAX} characters, got ${line.length}`);
+try {
+  run();
+} catch (err) {
+  console.error(`error: ${err instanceof Error ? err.message : String(err)}`);
+  process.exitCode = 1;
 }
-
-await mkdir(targetDir, { recursive: true });
-await writeFile(targetPath, line, "utf8");
-console.log(`wrote ${line.length} characters to ${targetPath}`);
