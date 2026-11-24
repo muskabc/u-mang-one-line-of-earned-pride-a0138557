@@ -5,8 +5,9 @@ const source = new URL("line.txt", import.meta.url);
 const destination = "/output/entry.txt";
 
 function run(): void {
-  const bytes = readFileSync(source);
-  const text = bytes.toString("utf8").replace(/\r?\n$/, "");
+  const raw = readFileSync(source).toString("utf8");
+  const debommed = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
+  const text = debommed.replace(/\r?\n$/, "");
 
   const singleLine = /^[^\r\n]+$/.test(text);
   if (!singleLine) {
@@ -23,6 +24,10 @@ function run(): void {
 
   mkdirSync("/output", { recursive: true });
   writeFileSync(destination, text, { encoding: "utf8", flag: "w" });
+  const writtenBack = readFileSync(destination, "utf8");
+  if (writtenBack !== text) {
+    throw new Error("entry.txt did not round-trip: written content differs from the validated line");
+  }
   console.log(`entry written: ${text.length} characters -> ${destination}`);
 }
 
